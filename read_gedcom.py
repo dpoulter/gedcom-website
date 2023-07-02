@@ -4,42 +4,43 @@ def parse_gedcom_file(filename, cursor):
     individuals = []
     families = []
     children = []
+    relationships = []
 
     with open(filename, 'r') as file:
         current_individual = {}
         current_family = {}
+        current_relationship1 = {}
+        current_relationship2 = {}
 
         for line in file:
             tokens = line.strip().split(' ')
-            print ('tokens='.join(tokens))
+            # print ('tokens='.join(tokens))
             level = int(tokens[0])
             if level == 0:
                     if len(tokens) >= 3 and tokens[2]:
                         tag = tokens[2]
                         arguments = tokens[1]
-                        print ('arguments='+str(arguments))
+                        # print ('arguments='+str(arguments))
                     else:
                         tag = None
                         arguments = None
             else:
-                if len(tokens) >= 3 and tokens[1]:
+                
                     tag = tokens[1]
                     arguments = ' '.join(tokens[2:])
-                    print ('arguments='+str(arguments))
-                else:
-                    tag = None
-                    arguments = None
+                    # print ('arguments='+str(arguments))
+                
+          #   if tag:
+           #      print ('tag='+tag)
+           #  else:
+           #      print ('tag=None')
 
-            if tag:
-                print ('tag='+tag)
-            else:
-                print ('tag=None')
-
+            # print('40')
             if level == 0:
                 if tag == 'INDI':
-                    level0_tag = 'INDI'
+                    #level0_tag = 'INDI'
                     individual_id = arguments.strip('@')
-                    print('individual_id='+individual_id)
+                    # print('individual_id='+individual_id)
 
                     if current_individual and individual_id != current_individual['individual_id']:
                         individuals.append({'individual_id': current_individual['individual_id'] , 'given_name': current_individual['given_name'], 'surname': current_individual['surname'], 'birth_date': current_individual['birth_date'], 'death_date': current_individual['death_date']})
@@ -49,48 +50,103 @@ def parse_gedcom_file(filename, cursor):
                     family_id = arguments.strip('@')
                     families.append({'family_id': family_id, 'husband_id': None, 'wife_id': None, 'marriage_date': None})
                     current_family = families[-1]
+                    
+                    
                 else:
                     level0_tag = ''
 
-                print ('level0_tag='+level0_tag)
-
+                # print ('level0_tag='+level0_tag)
+           
             elif level == 1:
-                
+                level1_tag = tag
+
                 if tag == 'BIRT':
-                    if 'birth_date' not in current_individual:
+                
                         current_individual['birth_date'] = None
                 elif tag == 'DEAT':
-                    if 'death_date' not in current_individual:
+                
                         current_individual['death_date'] = None
                 elif tag == 'HUSB':
                     if current_family is not None:
                         current_family['husband_id'] = arguments.strip('@')
+                        relationships.append({'individual_id': current_family['husband_id'], 'spouse_id': None, 'date': None, 'event': None})
+                        current_relationship1 = relationships[-1]
+                        
                 elif tag == 'WIFE':
                     if current_family is not None:
                         current_family['wife_id'] = arguments.strip('@')
+                        relationships.append({'individual_id': current_family['wife_id'], 'spouse_id': None, 'date': None, 'event': None})
+                        current_relationship2 = relationships[-1]
                 elif tag == 'MARR':
-                    if 'marriage_date' not in current_family:
-                        current_family['marriage_date'] = None
+                    print('50 - Tag='+tag)
+                    if current_family is not None:
+                       
+                            current_family['marriage_date'] = None
+
+                            
+        
+                    # Find the corresponding relationship and update the spouse_id
+                    print ('MARR - Find the corresponding relationship and update the spouse_id')
+                    for rel in relationships:
+                        if rel['individual_id'] == current_family['husband_id']:
+                            rel['spouse_id'] = current_family['wife_id']
+                        elif rel['individual_id'] == current_family['wife_id']:
+                            rel['spouse_id'] = current_family['husband_id']
+                    print('66')
+                    current_relationship1['event'] = 'MARR'
+                    current_relationship2['event'] = 'MARR'
+                    
+              
+
+                elif tag == 'DIV':
+                    print('70')
+                    if current_family is not None:
+                     
+                            current_family['divorce_date'] = None
+
+                    print ('105:Check if current relationship is not none')
+                             
+                    # Find the corresponding relationship and update the spouse_id
+                    print ('DIV -  Find the corresponding relationship and update the spouse_id')
+                    for rel in relationships:
+                        if rel['individual_id'] == current_family['husband_id']:
+                            rel['spouse_id'] = current_family['wife_id']
+                        elif rel['individual_id'] == current_family['wife_id']:
+                            rel['spouse_id'] = current_family['husband_id']
+                    print('75')
+                    current_relationship1['event'] = 'DIV'
+                    current_relationship2['event'] = 'DIV'
+                    
+
                 elif tag == 'CHIL':
+                    # print('80')
                     if current_family is not None:
                         children.append({'child_id': arguments.strip('@'), 'father_id': current_family['husband_id'], 'mother_id': current_family['wife_id']})
 
             elif level == 2:
+
                 if tag == 'DATE':
+                    print('90')
                     if current_individual and current_individual.get('birth_date') is None:
                         current_individual['birth_date'] = arguments
                     elif current_individual and current_individual.get('death_date') is None:
                         current_individual['death_date'] = arguments
-                    elif current_family and current_family.get('marriage_date') is None:
-                        current_family['marriage_date'] = arguments
+                    elif level1_tag=='MARR' or level1_tag=='DIV':
+                            current_relationship1['date']= arguments
+                            current_relationship2['date']= arguments
+                            print(current_relationship1)
+                            print(current_relationship2)
+
                 elif tag == 'SURN':
                     current_individual['surname'] = arguments
                 elif tag == 'GIVN':
                     current_individual['given_name'] = arguments
+                
+
 
     print('insert individuals')
     for individual_data in individuals:
-        print ('insert individual_id='+individual_data['individual_id']+' given_name='+individual_data['given_name']+' surname='+individual_data['surname'])
+        #print ('insert individual_id='+individual_data['individual_id']+' given_name='+individual_data['given_name']+' surname='+individual_data['surname'])
         cursor.execute("""
             INSERT INTO individuals (individual_id, given_name, surname, birth_date, death_date)
             VALUES (%s, %s, %s, %s, %s)
@@ -110,7 +166,19 @@ def parse_gedcom_file(filename, cursor):
             VALUES (%s, %s, %s)
         """, (child_data['child_id'], child_data['father_id'], child_data['mother_id']))
 
-
+    print('insert relationships')
+    for rel_data in relationships:
+        
+        if rel_data['event']=='MARR':
+            cursor.execute("""
+                INSERT INTO Relationships (IndividualID, SpouseID, MarriageDate)
+                VALUES (%s, %s, %s)
+                """, (rel_data['individual_id'], rel_data['spouse_id'], rel_data['date']))
+        elif rel_data['event']=='DIV':
+            cursor.execute("""
+                INSERT INTO Relationships (IndividualID, SpouseID, DivorceDate)
+                VALUES (%s, %s, %s)
+                """, (rel_data['individual_id'], rel_data['spouse_id'], rel_data['date']))
 
 
 def main():

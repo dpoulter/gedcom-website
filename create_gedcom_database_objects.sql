@@ -19,13 +19,13 @@ CREATE TABLE Places (
 
 -- Create the Relationships table
 CREATE TABLE Relationships (
-  RelationshipID INT PRIMARY KEY,
-  IndividualID INT,
-  SpouseID INT,
-  MarriageDate DATE,
-  DivorceDate DATE,
-  FOREIGN KEY (IndividualID) REFERENCES Individuals(IndividualID),
-  FOREIGN KEY (SpouseID) REFERENCES Individuals(IndividualID)
+  RelationshipID INT  AUTO_INCREMENT PRIMARY KEY,
+  IndividualID varchar(50),
+  SpouseID varchar(50),
+  MarriageDate varchar(50),
+  DivorceDate varchar(50),
+  FOREIGN KEY (IndividualID) REFERENCES individuals(Individual_ID),
+  FOREIGN KEY (SpouseID) REFERENCES individuals(Individual_ID)
 );
 
 -- Create the Children table
