@@ -1,16 +1,44 @@
 import mysql.connector
 
+def get_or_create_place_id(cursor, place_name):
+    # First, try to get the PlaceID for the given place_name
+    cursor.execute("""
+        SELECT PlaceID FROM Places WHERE Name = %s
+    """, (place_name,))
+    result = cursor.fetchone()
+
+    # If the place_name was found in the Places table, return its PlaceID
+    if result is not None:
+        return result[0]
+
+    # If the place_name was not found in the Places table, we need to insert it
+    cursor.execute("""
+        INSERT INTO Places (Name) VALUES (%s)
+    """, (place_name,))
+
+    # After inserting, we get the last inserted id
+    place_id = cursor.lastrowid
+
+    # Return the PlaceID of the newly inserted place
+    return place_id
+
+
 def parse_gedcom_file(filename, cursor):
     individuals = []
     families = []
     children = []
     relationships = []
+    events = []
+    family_event_detail = []
 
     with open(filename, 'r') as file:
         current_individual = {}
         current_family = {}
         current_relationship1 = {}
         current_relationship2 = {}
+        current_event1 = {}
+        current_event2 = {}
+
 
         for line in file:
             tokens = line.strip().split(' ')
@@ -77,16 +105,15 @@ def parse_gedcom_file(filename, cursor):
                         current_family['wife_id'] = arguments.strip('@')
                         relationships.append({'individual_id': current_family['wife_id'], 'spouse_id': None, 'date': None, 'event': None})
                         current_relationship2 = relationships[-1]
+                
                 elif tag == 'MARR':
                     print('50 - Tag='+tag)
                     if current_family is not None:
-                       
                             current_family['marriage_date'] = None
 
-                            
-        
                     # Find the corresponding relationship and update the spouse_id
                     print ('MARR - Find the corresponding relationship and update the spouse_id')
+
                     for rel in relationships:
                         if rel['individual_id'] == current_family['husband_id']:
                             rel['spouse_id'] = current_family['wife_id']
@@ -95,8 +122,11 @@ def parse_gedcom_file(filename, cursor):
                     print('66')
                     current_relationship1['event'] = 'MARR'
                     current_relationship2['event'] = 'MARR'
-                    
-              
+
+                    # Add the Event record
+                    events.append({'IndividualID': current_family['wife_id'], 'EventType': 'MARR', 'EventDate': None, 'EventPlaceID': None})
+                    events.append({'IndividualID': current_family['husband_id'], 'EventType': 'MARR', 'EventDate': None, 'EventPlaceID': None})
+                    current_event = events[-1]
 
                 elif tag == 'DIV':
                     print('70')
@@ -116,6 +146,12 @@ def parse_gedcom_file(filename, cursor):
                     print('75')
                     current_relationship1['event'] = 'DIV'
                     current_relationship2['event'] = 'DIV'
+
+                     # Add the Event record
+                    events.append({'IndividualID': current_family['wife_id'], 'EventType': 'DIV', 'EventDate': None, 'EventPlaceID': None})
+                    current_event1 = events[-1]
+                    events.append({'IndividualID': current_family['husband_id'], 'EventType': 'DIV', 'EventDate': None, 'EventPlaceID': None})
+                    current_event2 = events[-1]
                     
 
                 elif tag == 'CHIL':
@@ -134,13 +170,20 @@ def parse_gedcom_file(filename, cursor):
                     elif level1_tag=='MARR' or level1_tag=='DIV':
                             current_relationship1['date']= arguments
                             current_relationship2['date']= arguments
-                            print(current_relationship1)
-                            print(current_relationship2)
+                            # Update the Event record
+                            current_event1['EventDate'] = arguments
+                            current_event2['EventDate'] = arguments
 
                 elif tag == 'SURN':
                     current_individual['surname'] = arguments
                 elif tag == 'GIVN':
                     current_individual['given_name'] = arguments
+                elif tag == 'PLAC':
+                     # Update the Event record
+                     current_event1['EventPlaceID'] = get_or_create_place_id(cursor,arguments)
+                     current_event2['EventPlaceID'] = get_or_create_place_id(cursor,arguments)
+                     print ('EventPlaceId  current_event1='+str(current_event1['EventPlaceID']))
+                     print ('EventPlaceId  current_event2='+str(current_event2['EventPlaceID']))
                 
 
 
@@ -180,6 +223,13 @@ def parse_gedcom_file(filename, cursor):
                 VALUES (%s, %s, %s)
                 """, (rel_data['individual_id'], rel_data['spouse_id'], rel_data['date']))
 
+
+    print('insert events')
+    for event_data in events:
+        cursor.execute("""
+            INSERT INTO Events (IndividualID, EventType, EventDate, EventPlaceID)
+            VALUES (%s, %s, %s, %s)
+        """, (event_data['IndividualID'], event_data['EventType'], event_data['EventDate'], event_data['EventPlaceID']))
 
 def main():
     try:

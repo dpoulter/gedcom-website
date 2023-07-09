@@ -57,7 +57,25 @@ def generate_web_pages(filepath, output_directory):
             
 
             # Generate the web page content
-            page_content = f"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<title>Ancestry</title>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css\">\n<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script>\n<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js\"></script>\n</head>\n<body>\n<div class=\"container\">\n<div class=\"jumbotron\" style=\"background-color:#e7f1f4\"><div class=\"row\"><div class=\"col-sm-2\"></div><div class=\"col-sm-4\"><div class=\"row\"><h3>{given_name} {surname}</h3></div>\n<div class=\"row\">b. {birth_date}</div>\n<div class=\"row\">d. {death_date}</div>\n</div>\n<div class=\"col-sm-2\"></div>\n<div class=\"col-sm-2\"></div>\n<div class=\"col-sm-2\"></div></div></div>{given_name} {surname} was born {birth_date} to <a href=\"P{father_id}_{father_name}.html\">{father_name}</a> and <a href=\"P{mother_id}_{mother_name}.html\">{mother_name}</a></br>\n"
+            page_content = f"""<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<title>Ancestry</title>\n
+            <script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script>\n
+            </head>\n
+            <body>\n
+            <div id="header"></div><script>$(function(){{$("\#header").load("header.html");}});</script><div class="container">
+            <div id=\"header\"></div><div class=\"container\">\n<div class=\"jumbotron\" style=\"background-color:#e7f1f4\"><div class=\"row\"><div class=\"col-sm-2\"></div><div class=\"col-sm-4\"><div class=\"row\"><h3>{given_name} {surname}</h3></div>\n<div class=\"row\">b. {birth_date}</div>\n<div class=\"row\">d. {death_date}</div>\n</div>\n<div class=\"col-sm-2\"></div>\n<div class=\"col-sm-2\"></div>\n<div class=\"col-sm-2\"></div></div></div>"""
+
+            if father_name and mother_name:
+                page_content += f"""{given_name} {surname} was born {birth_date} to 
+                <a href=\"P{father_id}_{father_name}.html\">{father_name}</a> and 
+                <a href=\"P{mother_id}_{mother_name}.html\">{mother_name}</a></br>\n"""
+            elif father_name:
+                page_content += f"""{given_name} {surname} was born {birth_date} to 
+                <a href=\"P{father_id}_{father_name}.html\">{father_name}</a></br>\n"""
+            elif mother_name:
+                page_content += f"""{given_name} {surname} was born {birth_date} to 
+                <a href=\"P{mother_id}_{mother_name}.html\">{mother_name}</a></br>\n"""
+            else:
+                page_content += f"""{given_name} {surname} was born {birth_date}.</br>\n"""
 
             print ('100')
             # Retrieve spouse's name and marriage date
@@ -73,7 +91,7 @@ def generate_web_pages(filepath, output_directory):
                 marriage_date = spouse_result[1] if spouse_result[1] is not None else ""
                 page_content += f" {given_name} {surname} married <a href=\"P{individual_id}_{spouse_name}.html\">{spouse_name}</a> {marriage_date}.</br>\n"
             else:
-                page_content += " {given_name} {surname} did not get married.</br>\n"
+                page_content += f" {given_name} {surname} did not get married.</br>\n"
             print ('120')
            
            
@@ -91,12 +109,18 @@ def generate_web_pages(filepath, output_directory):
 
            # Check if there are children and generate the children list
             if children_names:
-                page_content += f"They had {len(children_names)} children: </br><ul>"
+                if spouse_result:
+                    page_content += f"They had {len(children_names)} children: </br><ul>"
+                else:
+                    page_content += f" {given_name} {surname} had {len(children_names)} children: </br><ul>"
                 for child in children_names:
                     page_content += f"<li>{child}</li>"
                 page_content += "</ul>"
             else:
-                page_content += "They had no children."          
+                if spouse_result:    
+                    page_content += "They had no children."
+                else:    
+                    page_content += f" {given_name} {surname} had no children."      
             print ('130')
             
             # Close the HTML tags
